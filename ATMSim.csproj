@@ -7,4 +7,10 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <Compile Remove="ATMSimTests\**" />
+    <EmbeddedResource Remove="ATMSimTests\**" />
+    <None Remove="ATMSimTests\**" />
+  </ItemGroup>
+
 </Project>
