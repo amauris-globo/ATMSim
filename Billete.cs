@@ -13,7 +13,7 @@ namespace ATMSim
         DOP1000,
         DOP2000,
     }
-    internal class Billete
+    public class Billete
     {
         public Denominacion Denominacion { get; set; }
 

@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ATMSim
@@ -11,13 +13,28 @@ namespace ATMSim
     {
         public EntidadYaRegistradaException() { }
         public EntidadYaRegistradaException(string mensaje) : base(mensaje) { }
+        public EntidadYaRegistradaException(string mensaje, Exception innerException) : base(mensaje, innerException) { }
     }
-    public class EntidadAunNoRegistradaException : Exception
+    public class EntidadNoRegistradaException : Exception
     {
-        public EntidadAunNoRegistradaException() { }
-        public EntidadAunNoRegistradaException(string mensaje) : base(mensaje) { }
+        public EntidadNoRegistradaException() { }
+        public EntidadNoRegistradaException(string mensaje) : base(mensaje) { }
+        public EntidadNoRegistradaException(string mensaje, Exception innerException) : base(mensaje, innerException) { }
     }
 
+    public class SecuenciaDeTeclasNoReconocidas : Exception
+    {
+        public SecuenciaDeTeclasNoReconocidas() { }
+        public SecuenciaDeTeclasNoReconocidas(string mensaje) : base(mensaje) { }
+        public SecuenciaDeTeclasNoReconocidas(string mensaje, Exception innerException) : base(mensaje, innerException) { }
+    }
+
+    public class RutaNoDisponibleException : Exception
+    {
+        public RutaNoDisponibleException() { }
+        public RutaNoDisponibleException(string mensaje) : base(mensaje) { }
+        public RutaNoDisponibleException(string mensaje, Exception innerException) : base(mensaje, innerException) { }
+    }
 
 
 
@@ -26,6 +43,14 @@ namespace ATMSim
     {
         Retiro,
         Consulta
+    }
+
+    public struct ConfiguracionOpKey
+    {
+        public string Teclas { get; set; }
+        public TipoTransaccion TipoTransaccion { get; set; }
+        public bool Recibo { get; set; }
+        public int? Monto { get; set; }
     }
 
     public struct Ruta
@@ -46,76 +71,248 @@ namespace ATMSim
         public string Destino { get; set; }
     }
 
-    internal class ATMSwitch
+    public interface IATMSwitch 
     {
-        private HSM hsm;
-        public Dictionary<string, byte[]> ATMKeys { get; set; } = new Dictionary<string, byte[]>();
+        public void RegistrarATM(ATM atm);
+        public void AgregarConfiguracionOpKey(ConfiguracionOpKey configuracionOpKey);
+        public void EliminarATM(ATM atm);
+        public void RegistrarAutorizador(IAutorizador autorizador);
+        public void EliminarAutorizador(string nombreAutorizador);
+        public void AgregarRuta(string bin, string nombreAutorizador);
+        public List<Comando> Autorizar(ATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin);
 
-        public Dictionary<string, Autorizador> Autorizadores { get; set; } = new Dictionary<string, Autorizador>();
 
-        public List<Ruta> tablaRuteo = new List<Ruta>();
+    }
 
-        public ATMSwitch()
+    public class ATMSwitch : IATMSwitch
+    {
+        private IHSM hsm;
+        private Dictionary<string, byte[]> LlavesDeAtm { get; set; } = new Dictionary<string, byte[]>();
+        private Dictionary<string, byte[]> LlavesDeAutorizador { get; set; } = new Dictionary<string, byte[]>();
+
+
+        private Dictionary<string, IAutorizador> Autorizadores { get; set; } = new Dictionary<string, IAutorizador>();
+
+
+
+        private List<Ruta> tablaRuteo = new List<Ruta>();
+        private List<ConfiguracionOpKey> tablaOpKeys = new List<ConfiguracionOpKey>();
+
+        private IConsoleWriter consoleWriter;
+
+        public ATMSwitch(IHSM hsm, IConsoleWriter consoleWriter)
         {
-            hsm = new HSM();
+            this.hsm = hsm;
+            this.consoleWriter = consoleWriter;
         }
 
         public void RegistrarATM(ATM atm)
         {
-            if (ATMKeys.ContainsKey(atm.Nombre))
+            if (LlavesDeAtm.ContainsKey(atm.Nombre))
                 throw new EntidadYaRegistradaException($"El ATM {atm.Nombre} ya se encuentra registrado");
-
+            
             byte[] llave = hsm.GenerarLlave();
 
-            ATMKeys[atm.Nombre] = llave;
+            LlavesDeAtm[atm.Nombre] = llave;
             atm.InstalarLlave(llave);
-            atm.Host = this;
+            atm.Switch = (IATMSwitch) this;
+        }
+
+        public void AgregarConfiguracionOpKey(ConfiguracionOpKey configuracionOpKey)
+        {
+            // Si ya existe un ConfiguracionOpKey config con la misma combinación de teclas, reemplazarlo
+            var queryOpKeyExistente = tablaOpKeys.Where(x => x.Teclas == configuracionOpKey.Teclas);
+            if (queryOpKeyExistente.Any())
+                tablaOpKeys.Remove(queryOpKeyExistente.Single());
+
+            tablaOpKeys.Add(configuracionOpKey);
         }
 
         public void EliminarATM(ATM atm)
         {
-            if (!ATMKeys.ContainsKey(atm.Nombre))
-                throw new EntidadAunNoRegistradaException($"El ATM {atm.Nombre} no se encuentra registrado");
+            if (!LlavesDeAtm.ContainsKey(atm.Nombre))
+                throw new EntidadNoRegistradaException($"El ATM {atm.Nombre} no se encuentra registrado");
 
             atm.Reestablecer();
-            ATMKeys.Remove(atm.Nombre);
+            LlavesDeAtm.Remove(atm.Nombre);
         }
 
-        public void Autorizar(TipoTransaccion tipoTransaccion, Tarjeta tarjeta, int monto, byte[] CryptogramaPin)
+        public List<Comando> Autorizar(ATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin)
         {
+            ConfiguracionOpKey opKeyConfig;
+            IAutorizador autorizador;
+            try
+            {
+                opKeyConfig = DeterminarTipoDeTransaccion(opKeyBuffer);
+                autorizador = DeterminarAutorizadorDestino(numeroTarjeta);
+            }
+            catch (Exception e)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(e.ToString());
+                Console.ResetColor();
+                return MostrarErrorGenerico();
+            }
+
+            if (!LlavesDeAtm.ContainsKey(atm.Nombre) || !LlavesDeAutorizador.ContainsKey(autorizador.Nombre))
+                return MostrarErrorGenerico();
+
+            byte[] criptogramaLlaveOrigen = LlavesDeAtm[atm.Nombre];
+            byte[] criptogramaLlaveDestino = LlavesDeAutorizador[autorizador.Nombre];
+
+            byte[] criptogramaTraducidoPin = hsm.TraducirPin(criptogramaPin, criptogramaLlaveOrigen, criptogramaLlaveDestino);
+
+
+            switch (opKeyConfig.TipoTransaccion)
+            {
+                case TipoTransaccion.Retiro: 
+                    return AutorizarRetiro(atm, numeroTarjeta, monto, criptogramaTraducidoPin, autorizador, opKeyConfig);
+                case TipoTransaccion.Consulta: 
+                    return AutorizarConsulta(atm, numeroTarjeta, criptogramaTraducidoPin, autorizador, opKeyConfig);
+                default:
+                    return MostrarErrorGenerico();
+
+            }
 
         }
 
-        public void RegistrarAutorizador(Autorizador autorizador)
+        private List<Comando> MostrarErrorGenerico()
         {
-
+            List<Comando> comandos = new List<Comando>();
+            string texto = "Lo Sentimos. En este momento no podemos procesar su transacción.\n\n" +
+                           "Por favor intente más tarde...";
+            comandos.Add(new ComandoMostrarInfoEnPantalla(texto, true));
+            return comandos;
         }
 
-        public void EliminarAutorizador(Autorizador autorizador)
+        private List<Comando> AutorizarRetiro(ATM atm, string numeroTarjeta, int monto, byte[] criptogramaPin, IAutorizador autorizador, ConfiguracionOpKey opKeyConfig)
         {
+            List<Comando> comandos = new List<Comando>();
 
+            RespuestaRetiro respuesta = autorizador.AutorizarRetiro(numeroTarjeta, monto, criptogramaPin);
+
+            switch (respuesta.CodigoRespuesta)
+            {
+                case 0:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Espere mientras se dispensa su dinero", false));
+                    comandos.Add(new ComandoDispensarEfectivo(respuesta.MontoAutorizado ?? 0));
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Favor de retirar su tarjeta", false));
+                    comandos.Add(new ComandoDevolverTarjeta());
+                    if (opKeyConfig.Recibo)
+                    {
+                        comandos.Add(new ComandoMostrarInfoEnPantalla("Imprimiento su recibo", false));
+
+                        comandos.Add(new ComandoImprimirRecibo($"Fecha: {DateTime.Today: g}\n" +
+                                                               $"ATM: {atm.Nombre}\n" +
+                                                               $"Monto Retirado: {respuesta.MontoAutorizado}\n" +
+                                                               $"Balance Actual: {respuesta.BalanceLuegoDelRetiro}"));
+                    }
+                    break;
+                case 51:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Su cuenta no posee balance suficiente para realizar el retiro", true));
+                    break;
+                case 55:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Pin incorrecto", true));
+                    break ;
+                case 56:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Tarjeta no reconocida", true));
+                    break;
+                default:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Su transacción no puede ser procesada. Por favor intente más tarde.", true));
+                    break;
+            }
+
+            return comandos;
         }
 
-        public string? ObtenerDestino(string tarjeta)
+        private List<Comando> AutorizarConsulta(ATM atm, string numeroTarjeta, byte[] criptogramaPin, IAutorizador autorizador, ConfiguracionOpKey opKeyConfig)
+        {
+            List<Comando> comandos = new List<Comando>();
+
+            RespuestaConsultaDeBalance respuesta = autorizador.ConsultarBalance(numeroTarjeta, criptogramaPin);
+
+            switch (respuesta.CodigoRespuesta)
+            {
+                case 0:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla($"Su balance actual es de: {respuesta.BalanceActual}", false));
+                    break;
+                case 55:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Pin incorrecto", true));
+                    break;
+                case 56:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Tarjeta no reconocida", true));
+                    break;
+                default:
+                    comandos.Add(new ComandoMostrarInfoEnPantalla("Su transacción no puede ser procesada. Por favor intente más tarde.", true));
+                    break;
+            }
+
+            return comandos;
+        }
+
+        public void RegistrarAutorizador(IAutorizador autorizador)
+        {
+            if (Autorizadores.ContainsKey(autorizador.Nombre))
+                throw new EntidadYaRegistradaException($"El Autorizador {autorizador.Nombre} ya se encuentra registrado");
+
+            byte[] llaveDeAutorizador = hsm.GenerarLlave();
+
+            Autorizadores[autorizador.Nombre] = autorizador;
+            LlavesDeAutorizador[autorizador.Nombre] = llaveDeAutorizador;
+            autorizador.InstalarLlave(llaveDeAutorizador);
+        }
+
+        public void EliminarAutorizador(string nombreAutorizador)
+        {
+            if (!Autorizadores.ContainsKey(nombreAutorizador))
+                throw new EntidadNoRegistradaException($"El Autorizador {nombreAutorizador} no se encuentra registrado");
+
+            Autorizadores.Remove(nombreAutorizador);
+            LlavesDeAutorizador.Remove(nombreAutorizador);
+        }
+
+        private IAutorizador DeterminarAutorizadorDestino(string numeroTarjeta)
+        {
+            string nombreAutorizador;
+            try
+            {
+                nombreAutorizador = tablaRuteo.Where(x => numeroTarjeta.StartsWith(x.Bin))
+                                              .OrderByDescending(x => x.Bin.Length)
+                                              .ThenBy(x => x.Destino)
+                                              .First()
+                                              .Destino;
+            }
+            catch (InvalidOperationException e) // si no se encuentra ninguna
+            {
+                throw new RutaNoDisponibleException($"No se encontró una ruta para el emisor de la tarjeta {Tarjeta.EnmascararNumero(numeroTarjeta)}", e);
+            }
+            try
+            {
+                return Autorizadores[nombreAutorizador];
+            }
+            catch (KeyNotFoundException e) // si no se encuentra ninguna
+            {
+                throw new EntidadNoRegistradaException($"El autorizador {nombreAutorizador} no se encuentra correctamente registrado", e);
+            }
+        }
+
+        private ConfiguracionOpKey DeterminarTipoDeTransaccion(string opKeyBuffer)
         {
             try
             {
-                return tablaRuteo.Where(x => tarjeta.StartsWith(x.Bin))
-                                 .OrderByDescending(x => x.Bin.Length)
-                                 .ThenBy(x => x.Destino)
-                                 .First()
-                                 .Destino;
+                return tablaOpKeys.Where(x => x.Teclas == opKeyBuffer)
+                                  .Single();
             }
-            catch (InvalidOperationException) // si no se encuentra ninguna
+            catch (InvalidOperationException e) // si no se encuentra ninguna
             {
-                return null;
+                throw new SecuenciaDeTeclasNoReconocidas($"No se reconoce la secuencia de letras {opKeyBuffer}", e);
             }
         }
 
         public void AgregarRuta(string bin, string nombreAutorizador)
         {
             if (!Autorizadores.ContainsKey(nombreAutorizador))
-                throw new EntidadAunNoRegistradaException($"El Autorizador {nombreAutorizador} no se encuentra registrado");
+                throw new EntidadNoRegistradaException($"El Autorizador {nombreAutorizador} no se encuentra registrado");
 
             // Si existe una ruta con el mismo bin, reemplazar destino
             var rutaExistentes = tablaRuteo.Where(x => x.Bin == bin);
