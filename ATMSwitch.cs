@@ -189,7 +189,17 @@ namespace ATMSim
         {
             List<Comando> comandos = new List<Comando>();
 
+            monto = monto == 0 ? opKeyConfig.Monto ?? 0 : monto;
+
+            if (monto == 0)
+            {
+                comandos.Add(new ComandoMostrarInfoEnPantalla("Monto inválido para retiro", true));
+                return comandos;
+            }
+
+
             RespuestaRetiro respuesta = autorizador.AutorizarRetiro(numeroTarjeta, monto, criptogramaPin);
+
 
             switch (respuesta.CodigoRespuesta)
             {
