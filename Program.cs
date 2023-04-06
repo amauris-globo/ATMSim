@@ -25,7 +25,7 @@ IThreadSleeper threadSleeper = new ThreadSleeper();
 IHSM hsm = new HSM();
 IATMSwitch atmSwitch = CrearSwitch(hsm, consoleWriter);
 
-ATM atm = CrearATM("AJP001", consoleWriter, threadSleeper);
+IATM atm = CrearATM("AJP001", consoleWriter, threadSleeper);
 RegistrarATMEnSwitch(atm, atmSwitch, hsm);
 
 IAutorizador autorizador = CrearAutorizador("AutDB", hsm);
@@ -37,7 +37,7 @@ SecuenciaDeTransaccionesDeEjemplo(atm, numeroTarjeta);
 
 
 //////////////////////////////// SETUP HELPER METHODS /////////////////////////
-static ATM CrearATM(string nombre, IConsoleWriter consoleWriter, IThreadSleeper threadSleeper) 
+static IATM CrearATM(string nombre, IConsoleWriter consoleWriter, IThreadSleeper threadSleeper) 
     => new ATM(nombre, consoleWriter, threadSleeper);
 
 
@@ -50,7 +50,7 @@ static string CrearCuentaYTarjeta(IAutorizador autorizador, TipoCuenta tipoCuent
 }
 
 
-static void RegistrarATMEnSwitch(ATM atm, IATMSwitch atmSwitch, IHSM hsm)
+static void RegistrarATMEnSwitch(IATM atm, IATMSwitch atmSwitch, IHSM hsm)
 {
     ComponentesLlave llaveATM = hsm.GenerarLlave();
     atm.InstalarLlave(llaveATM.LlaveEnClaro);
@@ -93,7 +93,7 @@ static IATMSwitch CrearSwitch(IHSM hsm, IConsoleWriter consoleWriter)
 
 //////////////////////////////// DEMO SEQUENCE /////////////////////////
 
-static void SecuenciaDeTransaccionesDeEjemplo(ATM atm, string numeroTarjeta)
+static void SecuenciaDeTransaccionesDeEjemplo(IATM atm, string numeroTarjeta)
 {
     EsperarTeclaEnter("Presione ENTER para realizar una consulta de balance");
     atm.EnviarTransactionRequest(teclasConsultaDeBalance, numeroTarjeta, pin);
@@ -126,11 +126,3 @@ static void EsperarTeclaEnter(string mensaje)
     Console.ReadKey();
     Console.ResetColor();
 }
-
-
-
-
-
-
-
-

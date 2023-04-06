@@ -73,13 +73,13 @@ namespace ATMSim
 
     public interface IATMSwitch 
     {
-        public void RegistrarATM(ATM atm, byte[] criptogramaLlave);
+        public void RegistrarATM(IATM atm, byte[] criptogramaLlave);
         public void AgregarConfiguracionOpKey(ConfiguracionOpKey configuracionOpKey);
-        public void EliminarATM(ATM atm);
+        public void EliminarATM(IATM atm);
         public void RegistrarAutorizador(IAutorizador autorizador, byte[] criptogramaLlaveAutorizador);
         public void EliminarAutorizador(string nombreAutorizador);
         public void AgregarRuta(string bin, string nombreAutorizador);
-        public List<Comando> Autorizar(ATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin);
+        public List<Comando> Autorizar(IATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin);
 
 
     }
@@ -106,7 +106,7 @@ namespace ATMSim
             this.consoleWriter = consoleWriter;
         }
 
-        public void RegistrarATM(ATM atm, byte[] criptogramaLlave)
+        public void RegistrarATM(IATM atm, byte[] criptogramaLlave)
         {
             if (LlavesDeAtm.ContainsKey(atm.Nombre))
                 throw new EntidadYaRegistradaException($"El ATM {atm.Nombre} ya se encuentra registrado");
@@ -125,7 +125,7 @@ namespace ATMSim
             tablaOpKeys.Add(configuracionOpKey);
         }
 
-        public void EliminarATM(ATM atm)
+        public void EliminarATM(IATM atm)
         {
             if (!LlavesDeAtm.ContainsKey(atm.Nombre))
                 throw new EntidadNoRegistradaException($"El ATM {atm.Nombre} no se encuentra registrado");
@@ -134,7 +134,7 @@ namespace ATMSim
             LlavesDeAtm.Remove(atm.Nombre);
         }
 
-        public List<Comando> Autorizar(ATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin)
+        public List<Comando> Autorizar(IATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin)
         {
             ConfiguracionOpKey opKeyConfig;
             IAutorizador autorizador;
@@ -182,7 +182,7 @@ namespace ATMSim
             return comandos;
         }
 
-        private List<Comando> AutorizarRetiro(ATM atm, string numeroTarjeta, int monto, byte[] criptogramaPin, IAutorizador autorizador, ConfiguracionOpKey opKeyConfig)
+        private List<Comando> AutorizarRetiro(IATM atm, string numeroTarjeta, int monto, byte[] criptogramaPin, IAutorizador autorizador, ConfiguracionOpKey opKeyConfig)
         {
             List<Comando> comandos = new List<Comando>();
 
@@ -232,7 +232,7 @@ namespace ATMSim
             return comandos;
         }
 
-        private List<Comando> AutorizarConsulta(ATM atm, string numeroTarjeta, byte[] criptogramaPin, IAutorizador autorizador, ConfiguracionOpKey opKeyConfig)
+        private List<Comando> AutorizarConsulta(IATM atm, string numeroTarjeta, byte[] criptogramaPin, IAutorizador autorizador, ConfiguracionOpKey opKeyConfig)
         {
             List<Comando> comandos = new List<Comando>();
 

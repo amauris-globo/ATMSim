@@ -8,6 +8,18 @@ using System.Text.RegularExpressions;
 
 namespace ATMSim
 {
+    public interface IATM
+    {
+        public IATMSwitch? Switch { get; set; }
+        public string Nombre { get; set; }
+
+        public bool Configurado { get; }
+
+        public void EnviarTransactionRequest(string opKeyBuffer, string numeroTarjeta, string pin, int monto = 0);
+        public void InstalarLlave(byte[] llave);
+        public void Reestablecer();
+
+    }
     public class ATMNoEstaRegistradoException : Exception { }
 
     public class Comando { }
@@ -33,7 +45,7 @@ namespace ATMSim
 
     public class ComandoDevolverTarjeta : Comando { }
 
-    public class ATM
+    public class ATM: IATM
     {
         private const int TAMANO_LLAVE = 32; // bytes
 
@@ -155,7 +167,7 @@ namespace ATMSim
         }
 
 
-        public byte[] Encriptar(string textoPlano)
+        private byte[] Encriptar(string textoPlano)
         {
             if (!Configurado)
                 throw new InvalidOperationException("El ATM aún no está configurado correctamente");
