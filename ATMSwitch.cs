@@ -73,10 +73,10 @@ namespace ATMSim
 
     public interface IATMSwitch 
     {
-        public void RegistrarATM(ATM atm);
+        public void RegistrarATM(ATM atm, byte[] criptogramaLlave);
         public void AgregarConfiguracionOpKey(ConfiguracionOpKey configuracionOpKey);
         public void EliminarATM(ATM atm);
-        public void RegistrarAutorizador(IAutorizador autorizador);
+        public void RegistrarAutorizador(IAutorizador autorizador, byte[] criptogramaLlaveAutorizador);
         public void EliminarAutorizador(string nombreAutorizador);
         public void AgregarRuta(string bin, string nombreAutorizador);
         public List<Comando> Autorizar(ATM atm, string opKeyBuffer, string numeroTarjeta, int monto, byte[] criptogramaPin);
@@ -106,15 +106,12 @@ namespace ATMSim
             this.consoleWriter = consoleWriter;
         }
 
-        public void RegistrarATM(ATM atm)
+        public void RegistrarATM(ATM atm, byte[] criptogramaLlave)
         {
             if (LlavesDeAtm.ContainsKey(atm.Nombre))
                 throw new EntidadYaRegistradaException($"El ATM {atm.Nombre} ya se encuentra registrado");
-            
-            byte[] llave = hsm.GenerarLlave();
 
-            LlavesDeAtm[atm.Nombre] = llave;
-            atm.InstalarLlave(llave);
+            LlavesDeAtm[atm.Nombre] = criptogramaLlave;
             atm.Switch = (IATMSwitch) this;
         }
 
@@ -260,16 +257,14 @@ namespace ATMSim
             return comandos;
         }
 
-        public void RegistrarAutorizador(IAutorizador autorizador)
+        public void RegistrarAutorizador(IAutorizador autorizador, byte[] criptogramaLlaveAutorizador)
         {
             if (Autorizadores.ContainsKey(autorizador.Nombre))
                 throw new EntidadYaRegistradaException($"El Autorizador {autorizador.Nombre} ya se encuentra registrado");
 
-            byte[] llaveDeAutorizador = hsm.GenerarLlave();
 
             Autorizadores[autorizador.Nombre] = autorizador;
-            LlavesDeAutorizador[autorizador.Nombre] = llaveDeAutorizador;
-            autorizador.InstalarLlave(llaveDeAutorizador);
+            LlavesDeAutorizador[autorizador.Nombre] = criptogramaLlaveAutorizador;
         }
 
         public void EliminarAutorizador(string nombreAutorizador)

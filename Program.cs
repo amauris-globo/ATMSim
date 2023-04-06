@@ -8,14 +8,21 @@ IThreadSleeper threadSleeper = new ThreadSleeper();
 
 IHSM hsm = new HSM();
 
+ComponentesLlave llaveAJP001 = hsm.GenerarLlave();
+
 
 ATM atm = new ATM("AJP001", consoleWriter, threadSleeper);
+atm.InstalarLlave(llaveAJP001.LlaveEnClaro);
 
+ComponentesLlave llaveAutorizadorDebito = hsm.GenerarLlave();
 
 IAutorizador autorizadorDebito = new Autorizador("AutDB", hsm);
 string numeroCuenta = autorizadorDebito.CrearCuenta(TipoCuenta.Corriente, 20_000);
 string numeroTarjeta = autorizadorDebito.CrearTarjeta("459413", numeroCuenta);
 autorizadorDebito.AsignarPin(numeroTarjeta, "1234");
+autorizadorDebito.InstalarLlave(llaveAutorizadorDebito.LlaveEncriptada);
+
+
 
 IATMSwitch atmSwitch = new ATMSwitch(hsm, consoleWriter);
 atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey() { 
@@ -33,8 +40,8 @@ atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey() {
     TipoTransaccion = TipoTransaccion.Consulta, 
     Recibo = false });
 
-atmSwitch.RegistrarATM(atm);
-atmSwitch.RegistrarAutorizador(autorizadorDebito);
+atmSwitch.RegistrarATM(atm, llaveAJP001.LlaveEncriptada);
+atmSwitch.RegistrarAutorizador(autorizadorDebito, llaveAutorizadorDebito.LlaveEncriptada);
 atmSwitch.AgregarRuta("459413", autorizadorDebito.Nombre);
 
 EsperarTeclaEnter("Presione ENTER para realizar una consulta de balance");
