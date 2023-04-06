@@ -130,37 +130,45 @@ pero igual se recomienda.
 
 ### Requerimientos:
 
-- **RQ01-Montos Decimales**: [*easy*] Permitir retiros de hasta 2 dígitos decimales. Realizar los ajustes necesarios al código para que se acepten 
+#### Easy:
+
+- **RQ01-Montos Decimales**: Permitir retiros de hasta 2 dígitos decimales. Realizar los ajustes necesarios al código para que se acepten 
 montos y balances en decimales, manteniendo hasta dos dígitos
 
-- **RQ02-Relación de Tarjetas y Cuentas**: [*easy*] Actualmente, las tarjetas tienen el número de cuenta almacenado como un atributo. En el mundo real, 
+- **RQ02-Relación de Tarjetas y Cuentas**: Actualmente, las tarjetas tienen el número de cuenta almacenado como un atributo. En el mundo real, 
 es el autorizador que guarda la relación entre Tarjetas y Cuentas, por lo que se debe implementar un cambio para que el autorizador tenga una 
 estructura de datos con la relación Tarjeta->Cuenta, y al recibir una transacción, consulte en esta estructura para determinar la cuenta.
 
-- **RQ03-Limite de Sobregiro Cuenta Corriente**: [*mid*] Actualmente, las cuentas corrientes se permiten sobregirar por cualquier cantidad. Se 
+#### Medium:
+
+- **RQ03-Limite de Sobregiro Cuenta Corriente**: Actualmente, las cuentas corrientes se permiten sobregirar por cualquier cantidad. Se 
 requiere implementar un parámetro que se configure en la creación de la cuenta, y que espcifique el límite de sobregiro, y si se excede este límite 
 se declinaría con fondos insuficientes.
 
-- **RQ04-Bloqueo de Tarjetas**: [*mid*] Implementar una estructura de "estado" de las tarjetas en el Autorizador, que permita bloquear la tarjeta 
+- **RQ04-Bloqueo de Tarjetas**: Implementar una estructura de "estado" de las tarjetas en el Autorizador, que permita bloquear la tarjeta 
 y que las transacciones declinen si la tarjeta está bloqueada. Esta declinación deberá mostrar un error en la pantalla del ATM indicando esto.
 
-- **RQ05-Límite de Retiro**: [*mid*] Implementar un límite para las transacciones de retiro, configurable por Autorizador. El límite será por transacción,
+- **RQ05-Límite de Retiro**: Implementar un límite para las transacciones de retiro, configurable por Autorizador. El límite será por transacción,
 lo que quiere decir que no se requiere un "acumulador" o mantener algún conteo entre transacción y transacción. Cuando se exceda el límite de retiro, 
 deberá mostrar una pantalla de error indicando ésto.
 
-- **RQ06-Dispensaciones parciales**: [*hard*] Implementar un contador del efectivo para el ATM; al crear el ATM se le especifica el balance del ATM
+#### Hard:
+
+- **RQ06-Dispensaciones parciales**: Implementar un contador del efectivo para el ATM; al crear el ATM se le especifica el balance del ATM
 y se descuenta por cada retiro. Al realizar un retiro, si el balance del ATM no es suficiente para completar el monto del retiro, el ATM dispensará
 "lo que le queda", y enviará el TransactionRequest sólo por el monto que puede dispensar. Al final de la transacción indicará al cliente que sólo pudo
 dispensar X cantidad.
 
-- **RQ07-Nueva Transacción: Depósitos**: [*hard*] Implementar una nueva transacción de Depósitos (con su propia combinación de teclas), la cual será lo 
+- **RQ07-Nueva Transacción: Depósitos**: Implementar una nueva transacción de Depósitos (con su propia combinación de teclas), la cual será lo 
 contrario del retiro, permitiendo agregarle dinero a una cuenta al realizar uno. Al realizar el depósito el ATM debe mostrar "> Efectivo Depositado: XXXXX", 
 por lo que se requiere un nuevo tipo de Comando de respuesta
 
-- **RQ08-Nueva Transacción: Cambio de PIN**: [*hard*] Implementar un nuevo tipo de transacción de "cambio de PIN" (con su propia combinación de teclas) 
+- **RQ08-Nueva Transacción: Cambio de PIN**: Implementar un nuevo tipo de transacción de "cambio de PIN" (con su propia combinación de teclas) 
 que requerirá el pin anterior y el pin nuevo. Si el pin anterior está incorrecto, se declina, indicando la razón en pantalla, y no se aplica el cambio 
 de PIN. Si el pin anterior se ingresa correcto, deberá realizarse el "cambio de PIN", y debe indicar que fue satisfactorio en la pantalla. Las futuras 
 transacciones con esa misma tarjeta sólo autorizarían con el nuevo PIN. Sólo se deben soportar pines de 4 dígitos numéricos
+
+#### Challenge:
 
 - **RQ09-Cargo de Retiro Internacional**: [*very hard*] Implementar un "cargo de retiro con tarjeta Internacional" que se configure por bin de la tarjeta 
 (bin=primeros 6 dígitos de la tarjeta). El ATMswitch deberá mantener una estructura con los bines que aplican para este cargo, y el monto del cargo para 
