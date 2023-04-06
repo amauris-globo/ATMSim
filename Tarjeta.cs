@@ -48,7 +48,7 @@ namespace ATMSim
             int count = 1;
             for (int n = numeroSinDigitoVerificador.Length - 1; n >= 0 ; n -= 1)
             {
-                int multiplo = count % 2 == 0? 2 : 1; // cada 2 posiciones se multiplica por 2
+                int multiplo = count % 2 == 0? 1 : 2; // cada 2 posiciones se multiplica por 2
                 int digito = (int) char.GetNumericValue(numeroSinDigitoVerificador[n]);
                 int prod = digito * multiplo; // se multiplica por 1 o 2 dependiendo de la posición
                 prod = prod > 9 ? prod - 9 : prod; // si es un número de 2 dígitos, se suma cada dígito del número
