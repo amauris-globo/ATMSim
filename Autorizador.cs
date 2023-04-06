@@ -78,7 +78,7 @@ namespace ATMSim
             if (!TarjetaExiste(numeroTarjeta))
                 throw new ArgumentException("Número de tarjeta no reconocido");
 
-            byte[] criptogramaPin = hsm.EncriptarPin(pin);
+            byte[] criptogramaPin = hsm.EncriptarPinConLlaveMaestra(pin);
 
             pinesTarjetas[numeroTarjeta] = criptogramaPin;
 

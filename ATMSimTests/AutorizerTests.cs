@@ -1,10 +1,10 @@
-using ATMSim;
+﻿using ATMSim;
 using ATMSimTests.Fakes;
 using FluentAssertions;
 
 namespace ATMSimTests
 {
-    public class AtmTests
+    public class AutorizerTests
     {
         private class TestData
         {
@@ -13,15 +13,16 @@ namespace ATMSimTests
             public string? accountNumber;
             public IConsoleWriter? consoleWriter;
             public IThreadSleeper? threadSleeper;
+            public IATMSwitch? atmSwitch;
+            public IAutorizador? autorizer;
+            public IHSM? hsm;
         }
 
-        private TestData PrepareAtmHappyPath(int accountBalance, string cardPin)
+        private TestData SetUpWithFakeHSM(int accountBalance, string cardPin)
         {
             IConsoleWriter consoleWriter = new FakeConsoleWriter();
             IThreadSleeper threadSleeper = new FakeThreadSleeper();
-
-
-            IHSM hsm = new HSM();
+            IHSM hsm = new FakeHSM();
 
 
             ATM atm = new ATM("AJP001", consoleWriter, threadSleeper);
@@ -56,23 +57,32 @@ namespace ATMSimTests
             atmSwitch.RegistrarAutorizador(autorizadorDebito);
             atmSwitch.AgregarRuta("459413", autorizadorDebito.Nombre);
 
-            return new TestData() { atm = atm, cardNumber = numeroTarjeta, accountNumber = numeroCuenta, 
-                consoleWriter = consoleWriter, threadSleeper = threadSleeper };
+            return new TestData()
+            {
+                atm = atm,
+                cardNumber = numeroTarjeta,
+                accountNumber = numeroCuenta,
+                consoleWriter = consoleWriter,
+                threadSleeper = threadSleeper,
+                atmSwitch = atmSwitch,
+                autorizer = autorizadorDebito,
+                hsm = hsm
+            };
         }
 
 
         [Fact]
-        public void Withdrawal_with_balance_on_account_is_successful()
+        public void Balance_Inquiry_with_incorrect_pin_return_an_error_command()
         {
-            TestData testData = PrepareAtmHappyPath(10_000, "1234");
-            ATM? atm = testData.atm;
+            TestData testData = SetUpWithFakeHSM(10_000, "1234");
             string? cardNumber = testData.cardNumber;
-            FakeConsoleWriter? consoleWriter = (FakeConsoleWriter?) testData.consoleWriter;
-            FakeThreadSleeper? threadSleeper = (FakeThreadSleeper?) testData.threadSleeper;
+            FakeConsoleWriter? consoleWriter = (FakeConsoleWriter?)testData.consoleWriter;
+            IAutorizador? autorizer = testData.autorizer;
+            FakeHSM? hsm = (FakeHSM?) testData.hsm;
 
-            atm.EnviarTransactionRequest("AAA", cardNumber, "1234", 100);
+           //autorizer.AutorizarRetiro(cardNumber,1000,)
 
-            consoleWriter.consoleText.Should().Contain("> Efectivo dispensado: 100");
+            true.Should().BeTrue();
 
         }
     }

@@ -12,7 +12,7 @@ namespace ATMSim
         public byte[] GenerarLlave();
         public byte[] TraducirPin(byte[] criptograma, byte[] criptogramaLlaveOrigen, byte[] criptogramaLlaveDestino);
 
-        public byte[] EncriptarPin(string pin);
+        public byte[] EncriptarPinConLlaveMaestra(string pin);
 
         public bool ValidarPin(byte[] criptogramaPinAValidar, byte[] criptogramaLlave, byte[] criptogramaPinCorrecto);
     }
@@ -46,7 +46,7 @@ namespace ATMSim
             return nuevoCriptograma;
         }
 
-        public byte[] EncriptarPin(string pin)
+        public byte[] EncriptarPinConLlaveMaestra(string pin)
         {
             return EncriptarDato(pin, this.lmk);
         }
