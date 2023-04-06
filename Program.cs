@@ -2,71 +2,122 @@
 using System.Net.NetworkInformation;
 using System.Threading;
 
+////////////////////////////////// CONSTANTS //////////////////////////////////
+
+
+const string pin = "1234";
+const string pinIncorrecto = "9999";
+const string binTarjeta = "459413";
+
+const TipoCuenta tipoDeCuenta = TipoCuenta.Ahorros;
+const int balanceInicialCuenta = 20_000;
+
+const string teclasRetiroConRecibo = "AAA";
+const string teclasRetiroSinRecibo = "AAC";
+const string teclasConsultaDeBalance = "B";
+
+/////////////////////////////////////// MAIN //////////////////////////////////
+
+
 IConsoleWriter consoleWriter = new ConsoleWriter();
 IThreadSleeper threadSleeper = new ThreadSleeper();
 
-
 IHSM hsm = new HSM();
+IATMSwitch atmSwitch = CrearSwitch(hsm, consoleWriter);
 
-ComponentesLlave llaveAJP001 = hsm.GenerarLlave();
+ATM atm = CrearATM("AJP001", consoleWriter, threadSleeper);
+RegistrarATMEnSwitch(atm, atmSwitch, hsm);
 
+IAutorizador autorizador = CrearAutorizador("AutDB", hsm);
+RegistrarAutorizadorEnSwitch(autorizador, atmSwitch, hsm);
 
-ATM atm = new ATM("AJP001", consoleWriter, threadSleeper);
-atm.InstalarLlave(llaveAJP001.LlaveEnClaro);
+string numeroTarjeta = CrearCuentaYTarjeta(autorizador, tipoDeCuenta, balanceInicialCuenta, binTarjeta, pin);
 
-ComponentesLlave llaveAutorizadorDebito = hsm.GenerarLlave();
-
-IAutorizador autorizadorDebito = new Autorizador("AutDB", hsm);
-string numeroCuenta = autorizadorDebito.CrearCuenta(TipoCuenta.Corriente, 20_000);
-string numeroTarjeta = autorizadorDebito.CrearTarjeta("459413", numeroCuenta);
-autorizadorDebito.AsignarPin(numeroTarjeta, "1234");
-autorizadorDebito.InstalarLlave(llaveAutorizadorDebito.LlaveEncriptada);
+SecuenciaDeTransaccionesDeEjemplo(atm, numeroTarjeta);
 
 
+//////////////////////////////// SETUP HELPER METHODS /////////////////////////
+static ATM CrearATM(string nombre, IConsoleWriter consoleWriter, IThreadSleeper threadSleeper) 
+    => new ATM(nombre, consoleWriter, threadSleeper);
 
-IATMSwitch atmSwitch = new ATMSwitch(hsm, consoleWriter);
-atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey() { 
-    Teclas = "AAA", 
-    TipoTransaccion = TipoTransaccion.Retiro, 
-    Recibo = true });
-atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey()
+
+static string CrearCuentaYTarjeta(IAutorizador autorizador, TipoCuenta tipoCuenta, int balanceInicial, string binTarjeta, string pin)
 {
-    Teclas = "AAC",
-    TipoTransaccion = TipoTransaccion.Retiro,
-    Recibo = false
-});
-atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey() { 
-    Teclas = "B", 
-    TipoTransaccion = TipoTransaccion.Consulta, 
-    Recibo = false });
+    string numeroCuenta = autorizador.CrearCuenta(tipoCuenta, balanceInicial);
+    string numeroTarjeta = autorizador.CrearTarjeta(binTarjeta, numeroCuenta);
+    autorizador.AsignarPin(numeroTarjeta, pin);
+    return numeroTarjeta;
+}
 
-atmSwitch.RegistrarATM(atm, llaveAJP001.LlaveEncriptada);
-atmSwitch.RegistrarAutorizador(autorizadorDebito, llaveAutorizadorDebito.LlaveEncriptada);
-atmSwitch.AgregarRuta("459413", autorizadorDebito.Nombre);
 
-EsperarTeclaEnter("Presione ENTER para realizar una consulta de balance");
-atm.EnviarTransactionRequest("B", numeroTarjeta, "1234");
+static void RegistrarATMEnSwitch(ATM atm, IATMSwitch atmSwitch, IHSM hsm)
+{
+    ComponentesLlave llaveATM = hsm.GenerarLlave();
+    atm.InstalarLlave(llaveATM.LlaveEnClaro);
+    atmSwitch.RegistrarATM(atm, llaveATM.LlaveEncriptada);
+}
 
-EsperarTeclaEnter("Presione ENTER para realizar un retiro de 12,000 sin impresión de recibo");
-atm.EnviarTransactionRequest("AAC",numeroTarjeta, "1234", 12_000);
+static IAutorizador CrearAutorizador(string nombre, IHSM hsm) => new Autorizador(nombre, hsm);
+static void RegistrarAutorizadorEnSwitch(IAutorizador autorizador, IATMSwitch atmSwitch, IHSM hsm)
+{
+    ComponentesLlave llaveAutorizador = hsm.GenerarLlave();
+    autorizador.InstalarLlave(llaveAutorizador.LlaveEncriptada);
+    atmSwitch.RegistrarAutorizador(autorizador, llaveAutorizador.LlaveEncriptada);
+    atmSwitch.AgregarRuta("459413", autorizador.Nombre);
+}
 
-EsperarTeclaEnter("Presione ENTER para realizar un intento retiro de 6,000 pero con pin incorrecto");
-atm.EnviarTransactionRequest("AAA", numeroTarjeta, "9999", 6_000);
 
-EsperarTeclaEnter("Presione ENTER para realizar una consulta de balance");
-atm.EnviarTransactionRequest("B", numeroTarjeta, "1234");
+static IATMSwitch CrearSwitch(IHSM hsm, IConsoleWriter consoleWriter)
+{
+    IATMSwitch atmSwitch = new ATMSwitch(hsm, consoleWriter);
+    atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey()
+    {
+        Teclas = teclasRetiroConRecibo,
+        TipoTransaccion = TipoTransaccion.Retiro,
+        Recibo = true
+    });
+    atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey()
+    {
+        Teclas = teclasRetiroSinRecibo,
+        TipoTransaccion = TipoTransaccion.Retiro,
+        Recibo = false
+    });
+    atmSwitch.AgregarConfiguracionOpKey(new ConfiguracionOpKey()
+    {
+        Teclas = teclasConsultaDeBalance,
+        TipoTransaccion = TipoTransaccion.Consulta,
+        Recibo = false
+    });
+    return atmSwitch;
+}
 
-EsperarTeclaEnter("Presione ENTER para realizar un retiro de 6,500 con recibo");
-atm.EnviarTransactionRequest("AAA", numeroTarjeta, "1234", 6_500);
+//////////////////////////////// DEMO SEQUENCE /////////////////////////
 
-EsperarTeclaEnter("Presione ENTER para realizar un intento de retiro de 4_000 que declinará por fondos insuficientes");
-atm.EnviarTransactionRequest("AAA", numeroTarjeta, "1234", 4_000);
+static void SecuenciaDeTransaccionesDeEjemplo(ATM atm, string numeroTarjeta)
+{
+    EsperarTeclaEnter("Presione ENTER para realizar una consulta de balance");
+    atm.EnviarTransactionRequest(teclasConsultaDeBalance, numeroTarjeta, pin);
 
-EsperarTeclaEnter("Presione ENTER para realizar un retiro de 12,000 sin impresión de recibo");
-atm.EnviarTransactionRequest("B", numeroTarjeta, "1234");
+    EsperarTeclaEnter("Presione ENTER para realizar un retiro de 12,000 sin impresión de recibo");
+    atm.EnviarTransactionRequest(teclasRetiroSinRecibo, numeroTarjeta, pin, 12_000);
 
-EsperarTeclaEnter("Presione ENTER para finalizar");
+    EsperarTeclaEnter("Presione ENTER para realizar un intento retiro de 6,000 pero con pin incorrecto");
+    atm.EnviarTransactionRequest(teclasRetiroConRecibo, numeroTarjeta, pinIncorrecto, 6_000);
 
+    EsperarTeclaEnter("Presione ENTER para realizar una consulta de balance");
+    atm.EnviarTransactionRequest(teclasConsultaDeBalance, numeroTarjeta, pin);
+
+    EsperarTeclaEnter("Presione ENTER para realizar un retiro de 6,500 con recibo");
+    atm.EnviarTransactionRequest(teclasRetiroConRecibo, numeroTarjeta, pin, 6_500);
+
+    EsperarTeclaEnter("Presione ENTER para realizar un intento de retiro de 4_000 que declinará por fondos insuficientes");
+    atm.EnviarTransactionRequest(teclasRetiroConRecibo, numeroTarjeta, pin, 4_000);
+
+    EsperarTeclaEnter("Presione ENTER para realizar un retiro de 12,000 sin impresión de recibo");
+    atm.EnviarTransactionRequest(teclasConsultaDeBalance, numeroTarjeta, pin);
+
+    EsperarTeclaEnter("Presione ENTER para finalizar");
+}
 
 static void EsperarTeclaEnter(string mensaje)
 {
